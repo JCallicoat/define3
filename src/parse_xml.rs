@@ -1,10 +1,10 @@
 extern crate quick_xml;
-use parse_xml::quick_xml::{events::Event, Reader};
+use crate::parse_xml::quick_xml::{events::Event, Reader};
 
 use std::io::BufRead;
 use std::path::Path;
 
-use Page;
+use crate::Page;
 
 fn parse_revision<B: BufRead>(reader: &mut Reader<B>) -> Option<String> {
     let mut buf = Vec::new();

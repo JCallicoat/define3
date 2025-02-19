@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use Meaning;
+use crate::Meaning;
 
 #[derive(Debug, PartialEq)]
 pub enum WikiContext {
@@ -12,7 +12,7 @@ pub enum WikiContext {
     Heading6(String),
 }
 
-use parse_wikitext::WikiContext::*;
+use crate::parse_wikitext::WikiContext::*;
 
 impl WikiContext {
     pub fn precedence(&self) -> u32 {
