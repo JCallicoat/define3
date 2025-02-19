@@ -14,7 +14,8 @@ use regex::{Captures, Regex};
 use rusqlite::Connection;
 use std::collections::BTreeMap;
 use std::env;
-use std::path::Path;
+use std::path::PathBuf;
+use std::process::exit;
 
 fn get_defns_by_lang(
     conn: &Connection,
@@ -113,16 +114,41 @@ where
 }
 
 fn main() {
+    let mut sqlite_path = dirs::data_dir().unwrap();
+    sqlite_path.push("define3");
+    sqlite_path.push("define3.sqlite3");
+
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help text");
-    opts.optflag("r", "raw", "don't expand wiki templates");
-    opts.optopt("l", "language", "only print this language", "lang");
-    let matches = opts.parse(&args[1..]).unwrap();
+    opts.optflag("h", "help", "Print this help text");
+    opts.optflag("r", "raw", "Don't expand wiki templates");
+    opts.optopt("l", "language", "Only print this language", "LANG");
+    opts.optopt(
+        "d",
+        "database",
+        format!(
+            "Database file path\n[default: {}]",
+            sqlite_path.to_string_lossy()
+        )
+        .as_ref(),
+        "FILE",
+    );
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => {
+            println!("{}", f.to_string());
+            exit(1);
+        }
+    };
+
     if matches.opt_present("h") || matches.free.len() != 1 {
         let brief = format!("Usage: {} [options] WORD", args[0]);
         print!("{}", opts.usage(&brief));
         return;
+    }
+    if matches.opt_present("d") {
+        sqlite_path = PathBuf::from(matches.opt_str("d").unwrap());
     }
 
     // TODO: We currently support nested templates in a very bad way. We expand templates in
@@ -130,10 +156,7 @@ fn main() {
     // Should eventually use a more legit parser (nom maybe?)
     let re_template = Regex::new(r"\{\{(?P<text>(?s:[^\{])*?)\}\}").unwrap();
 
-    let mut sqlite_path = dirs::data_dir().unwrap();
-    sqlite_path.push("define3");
-    sqlite_path.push("define3.sqlite3");
-    let conn = Connection::open(Path::new(&sqlite_path)).unwrap();
+    let conn = Connection::open(sqlite_path).unwrap();
 
     let all_langs = *get_defns_by_lang(&conn, &matches.free[0]);
     let langs = match matches.opt_str("l") {
