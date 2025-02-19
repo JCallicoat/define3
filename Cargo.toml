@@ -2,6 +2,7 @@
 name = "define3"
 version = "0.1.0"
 authors = ["neynt <hyriodula@gmail.com>"]
+edition = "2021"
 
 [dependencies]
 colored = "~1"
