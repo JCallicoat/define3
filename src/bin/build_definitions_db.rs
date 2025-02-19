@@ -11,10 +11,11 @@ use getopts::Options;
 use regex::Regex;
 use rusqlite::{Connection, Transaction};
 use std::collections::{HashMap, HashSet};
-use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
+use std::process::exit;
+use std::{env, fs};
 
 fn main() {
     // TODO: figure out list of languages automatically
@@ -59,11 +60,45 @@ fn main() {
     .cloned()
     .collect();
 
+    let mut modules_path = env::current_dir().unwrap();
+    modules_path.push("modules");
+    let mut sqlite_path = dirs::data_dir().unwrap();
+    sqlite_path.push("define3");
+    sqlite_path.push("define3.sqlite3");
+
     let args: Vec<String> = std::env::args().collect();
     let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help text");
-    let matches = opts.parse(&args[1..]).unwrap();
-    if matches.opt_present("h") || matches.free.len() != 1 {
+    opts.optopt(
+        "m",
+        "modules",
+        format!(
+            "Directory to store wikitionary modules\n[default: {}]",
+            modules_path.to_string_lossy()
+        )
+        .as_ref(),
+        "DIR",
+    );
+    opts.optopt(
+        "d",
+        "database",
+        format!(
+            "Database file path\n[default: {}]",
+            sqlite_path.to_string_lossy(),
+        )
+        .as_ref(),
+        "FILE",
+    );
+    opts.optflag("h", "help", "Print this help text");
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => {
+            println!("{}", f.to_string());
+            exit(1);
+        }
+    };
+
+    if matches.opt_present("h") || matches.free.is_empty() {
         let brief = format!(
             "Usage: {} PATH_TO_enwiktionary-YYYYMMDD-pages-meta-current.xml [options]",
             args[0]
@@ -71,12 +106,16 @@ fn main() {
         print!("{}", opts.usage(&brief));
         return;
     }
+    if matches.opt_present("m") {
+        modules_path = PathBuf::from(matches.opt_str("m").unwrap());
+    }
+    if matches.opt_present("d") {
+        sqlite_path = PathBuf::from(matches.opt_str("d").unwrap());
+    }
+
     let xml_path = matches.free[0].clone();
 
-    let mut sqlite_path = dirs::data_dir().unwrap();
-    sqlite_path.push("define3");
-    std::fs::create_dir_all(&sqlite_path).unwrap();
-    sqlite_path.push("define3.sqlite3");
+    std::fs::create_dir_all(&sqlite_path.parent().unwrap()).unwrap();
 
     let mut conn = Connection::open(&sqlite_path).unwrap();
     let tx = Transaction::new(&mut conn, rusqlite::TransactionBehavior::Exclusive).unwrap();
@@ -146,8 +185,7 @@ fn main() {
             .unwrap();
 
             println!("Saved module: {}", page.title);
-            let path = format!("modules/{}.lua", page.title);
-            let path = Path::new(&path);
+            let path = modules_path.join(format!("{}.lua", page.title));
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             let mut file = File::create(path).unwrap();
             file.write_all(page.content.as_bytes()).unwrap();
