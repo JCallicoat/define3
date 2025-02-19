@@ -88,8 +88,11 @@ fn replace_template(_conn: &Connection, caps: &Captures) -> String {
     }
 }
 
-fn print_words<F>(langs: &BTreeMap<String, BTreeMap<String, Vec<String>>>, mut format: F)
-where
+fn print_words<F>(
+    word: &str,
+    langs: &BTreeMap<String, BTreeMap<String, Vec<String>>>,
+    mut format: F,
+) where
     F: FnMut(&str) -> String,
 {
     let textwrap_opts = textwrap::Options::new(80)
@@ -97,13 +100,22 @@ where
         .subsequent_indent("      ");
 
     for (lang, poses) in langs {
-        println!("{}", lang.green().bold());
-        for (pos, defns) in poses {
+        println!("{}\n", lang.green().bold());
+        let joined_pos = poses
+            .keys()
+            .map(|k| k.to_owned())
+            .collect::<Vec<String>>()
+            .join(", ");
+        println!("  {} ({})\n", word.bold(), joined_pos);
+        for (i, (pos, defns)) in poses.iter().enumerate() {
             println!("  {}", pos.white());
-            for defn in defns {
+            for (j, defn) in defns.iter().enumerate() {
                 let defn = format(defn);
                 let defn = textwrap::fill(&defn, &textwrap_opts);
                 println!("{}", defn);
+                if j < defns.len() - 1 || i < poses.len() {
+                    println!()
+                }
             }
         }
     }
@@ -169,7 +181,7 @@ fn main() {
             result
         }
     };
-    print_words(&langs, |s| {
+    print_words(&matches.free[0], &langs, |s| {
         let replace_template = |caps: &Captures| -> String { replace_template(&conn, caps) };
         let mut result = s.to_owned();
         if !matches.opt_present("r") {
