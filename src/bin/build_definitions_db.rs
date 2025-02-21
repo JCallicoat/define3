@@ -51,6 +51,7 @@ fn main() {
         "Kanji",
         "Noun",
         "Phrase",
+        "Pronoun",
         "Proper noun",
         "Rafsi",
         "Romanization",
