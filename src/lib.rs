@@ -3,6 +3,7 @@ pub mod parse_xml;
 
 #[derive(Debug)]
 pub struct Meaning {
+    pub name: String,
     pub language: String,
     pub part_of_speech: String,
     pub definition: String,

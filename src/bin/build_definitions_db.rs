@@ -219,7 +219,12 @@ fn main() {
                 src: page.content,
             })),
             _ => {
-                let meanings = parse_wikitext(page.content, &languages, &parts_of_speech);
+                let meanings = parse_wikitext(
+                    page.title.clone(),
+                    page.content,
+                    &languages,
+                    &parts_of_speech,
+                );
                 Box::new(PageContent::Word(Word {
                     name: page.title,
                     meanings: meanings,

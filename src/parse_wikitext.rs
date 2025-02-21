@@ -89,6 +89,7 @@ impl ContextStack {
 }
 
 pub fn parse_wikitext(
+    name: String,
     text: String,
     languages: &HashSet<&str>,
     parts_of_speech: &HashSet<&str>,
@@ -157,6 +158,7 @@ pub fn parse_wikitext(
             context_stack.language.as_ref().and_then(|language| {
                 context_stack.part_of_speech.as_ref().map(|part_of_speech| {
                     result.push(Meaning {
+                        name: name.clone(),
                         language: language.clone(),
                         part_of_speech: part_of_speech.clone(),
                         definition: String::from(&line[2..]),
