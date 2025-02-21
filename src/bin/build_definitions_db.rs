@@ -116,7 +116,7 @@ fn main() {
 
     let xml_path = matches.free[0].clone();
 
-    std::fs::create_dir_all(&sqlite_path).unwrap();
+    std::fs::create_dir_all(&sqlite_path.parent().unwrap()).unwrap();
 
     let mut conn = Connection::open(&sqlite_path).unwrap();
     let tx = Transaction::new(&mut conn, rusqlite::TransactionBehavior::Exclusive).unwrap();
