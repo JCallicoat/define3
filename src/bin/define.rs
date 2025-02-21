@@ -83,23 +83,127 @@ fn expand_template(conn: &Connection, args: &[&str]) -> String {
 }
 #[warn(dead_code)]
 
+fn make_ascii_titlecase(s: &mut str) {
+    if let Some(r) = s.get_mut(0..1) {
+        r.make_ascii_uppercase();
+    }
+}
+
+fn parse_place(elems: Vec<&str>) -> String {
+    let mut result = String::new();
+    for elem in elems {
+        if elem == "ucomm" {
+            result.push_str("(Unincorporated Community) ")
+        } else if elem == "CDP" || elem == "cdp" {
+            result.push_str("(Census-Designated Place) ");
+        } else if elem == "minor city" {
+            result.push_str("(Minor City) ")
+        } else if elem == "electoral division" {
+            result.push_str("(Electoral Division) ");
+        } else if elem.starts_with("seat=") {
+            result.push_str(format!(" (Seat {})", elem.split("=").last().unwrap()).as_ref());
+        } else if elem.starts_with("One of") {
+            result.push_str(
+                parse_place(
+                    elem.replace("<<", "")
+                        .replace(">>", "")
+                        .split(" ")
+                        .collect(),
+                )
+                .as_ref(),
+            );
+        } else if elem.starts_with("in ") || elem == "and" {
+            result.push_str(format!("{} ", elem).as_ref());
+        } else if elem.starts_with("c/") {
+            result.push_str(format!("{}", elem.replace("c/", "")).as_ref());
+        } else if elem.starts_with("cc/") {
+            result.push_str(format!("{}", elem.replace("cc/", "")).as_ref());
+        } else if elem.starts_with("s/") {
+            result.push_str(format!("{}, ", elem.replace("s/", "")).as_ref());
+        } else if elem.starts_with("co/") {
+            result.push_str(format!("{}, ", elem.replace("co/", "")).as_ref());
+        } else if elem.starts_with("state/") {
+            let mut state = elem.replace("state/", "");
+            make_ascii_titlecase(state.as_mut());
+            result.push_str(format!("{}, ", state).as_ref());
+        } else if elem.starts_with("city/") {
+            let mut city = elem.replace("city/", "");
+            make_ascii_titlecase(city.as_mut());
+            result.push_str(format!("{}, ", city).as_ref());
+        } else if elem.starts_with("town/") {
+            let mut town = elem.replace("town/", "");
+            make_ascii_titlecase(town.as_mut());
+            result.push_str(format!("{}, ", town).as_ref());
+        } else if elem.starts_with("prefecture:") {
+            let mut prefecture = elem.replace("prefecture:", "").replace("Suf/", "");
+            make_ascii_titlecase(prefecture.as_mut());
+            result.push_str(format!("{} prefecture, ", prefecture).as_ref());
+        } else if elem.starts_with("ar:") {
+            let mut ar = elem.replace("ar:", "").replace("Suf/", "");
+            make_ascii_titlecase(ar.as_mut());
+            result.push_str(format!("{} Autonomous Region, ", ar).as_ref());
+        } else {
+            result.push_str(format!("{} ", elem).as_ref());
+        }
+    }
+    result.trim_end().replace(",,", ",").to_string()
+}
+
 // For now, we just hardcode a couple common templates.
 fn replace_template(_conn: &Connection, caps: &Captures) -> String {
     let s = caps.get(1).unwrap().as_str();
-    let elems: Vec<&str> = s.split('|').collect();
+    let mut elems: Vec<&str> = s.split('|').collect();
     //match elems[0] {
     //    _ => expand_template(conn, &elems)
     //}
     match elems[0] {
         "," => ",".to_owned(),
-        "ngd" | "unsupported" | "non-gloss definition" => elems[1].to_owned(),
-        "alternative form of" => format!("Alternative form of {}", elems[1]),
+        "1" | "cap" => {
+            let mut title = elems[1].to_owned();
+            make_ascii_titlecase(title.as_mut());
+            title
+        }
+        "ngd" | "unsupported" | "non-gloss definition" | "gloss" => elems[1].to_owned(),
+        "alternative form of" => format!("Alternative form of {}", elems[2]),
+        "alt form" => format!("Alternative form of {}", elems[2]),
         "ja-romanization of" => format!("Rōmaji transcription of {}", elems[1]),
         "sumti" => format!("x{}", elems[1]),
         "ja-def" => format!("{}:", elems[1]),
         "qualifier" => format!("({})", elems[1]),
-        "lb" => format!("({})", elems[2]),
-        "m" | "l" => elems[2].to_owned(),
+        "lb" => format!(
+            "({})",
+            elems[2..]
+                .iter()
+                .filter(|e| **e != "_")
+                .copied()
+                .collect::<Vec<&str>>()
+                .join(", ")
+        ),
+        "q" => format!("({})", elems[1]),
+        "c" | "m" | "l" | "w" => elems[2].to_owned(),
+        "senseid" => String::new(),
+        "alternative case form of" => format!("Alternative case form of {}", elems[2]),
+        "plural of" => format!("Plural of {}", elems[2]),
+        "infl of" => format!("Inflected form of {}", elems[2]),
+        "syn of" | "synonym of" => format!("Synonym of {}", elems[2]),
+        "acronym of" => format!("Acronym of {}", elems[2]),
+        "initialism of" => format!("Initialism of {}", elems[2]),
+        "abbreviation of" => format!("Abbreviation of {}", elems[2]),
+        "clipping of" => format!("Clipping of {}", elems[2]),
+        "surname" => "Surname".to_string(),
+        "given name" => "Given name".to_string(),
+        "defdate" => format!("[{}]", elems[1]),
+        "place" => format!("(Place) {}", parse_place(elems[2..].to_vec())),
+        "taxfmt" => format!("{}", elems[1..elems.len() - 1].join(" ")),
+        "alt sp" => {
+            let place = elems[3].replace("t=", "").clone();
+            elems[3] = place.as_ref();
+            format!(
+                "Alt spelling of {} {}",
+                elems[2],
+                parse_place(elems[3..].to_vec())
+            )
+        }
         _ => caps.get(0).unwrap().as_str().to_owned(),
     }
 }
